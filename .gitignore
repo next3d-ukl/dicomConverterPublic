@@ -1,0 +1,6 @@
+.DS_Store
+.venv
+.idea
+Blender
+__pycache__
+__init__.py

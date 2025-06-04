@@ -1,0 +1,9 @@
+PyQt5
+pydicom
+opencv-python
+Pillow
+numpy
+pyqtgraph
+numpy-stl
+PyOpenGL
+bpy==4.0.0
