@@ -270,7 +270,7 @@ class DicomService:
                 progress_counter += 1
                 
                 # Show file progress
-                #print(f"{progress_counter} / {total_dicom_images}")                
+                print(f"PROGRESS: {int(progress_counter/2)} / {total_dicom_images}")                
             except Exception as e:
                 print(f"Error processing slice: {e}")
                 continue
