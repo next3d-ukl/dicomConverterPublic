@@ -2,6 +2,9 @@
 
 This project is a additional tool for the visionOS App NextViewer.
 It's a python application which helps you converting medical images from DICOM and segmentations from STL or OBJ to PNG and USDZ for the use in NextViewer.
+To get started read the instructions below or for more detailed instructions read https://github.com/next3d-ukl/dicomConverterPublic/blob/main/detailed_guide.pdf .
+
+Pls contact us by any issues under: hl2@next3d.de or in the issues.
 
 ## Requirements
 
