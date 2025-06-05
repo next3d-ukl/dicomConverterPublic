@@ -110,6 +110,10 @@ dicomConverterPublic
 
 ## Troubleshooting
 
+### Incorrect image conversion
+
+- If conversion of dicom results in distortion and/or mirroring read the detailed guide https://github.com/next3d-ukl/dicomConverterPublic/blob/main/detailed_guide.pdf
+
 ### Import Errors
 - **Error: "cannot import name 'mesh' from 'stl'"**: This usually means the numpy-stl package is not installed. Run `pip install numpy-stl` to fix this issue.
 
