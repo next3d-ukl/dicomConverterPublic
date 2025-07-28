@@ -21,8 +21,8 @@ def convert_dicom_to_images(input_path: str, output_path: str) -> Tuple[str, flo
     """
     # Set Progress Bar
     total_dicom_images = str(len(os.listdir(input_path)))
-    # Initial progress indicator (0%)
-    progress_counter = 0
+
+    distance = 0
 
     # Step 1: Load DICOM slices
     slices = load_slices(input_path)
@@ -56,18 +56,26 @@ def convert_dicom_to_images(input_path: str, output_path: str) -> Tuple[str, flo
             orientation = "unknown"
             data_json['sliceOrientation'] = orientation
 
-    # Step 3.1: Create images folder
-    filepathImages = os.path.normpath(os.path.join(output_path, "images"))
-
-    if not os.path.exists(filepathImages):
-        os.makedirs(filepathImages)
-    # Step 3.2: Create orientation folder
-    filepathOrientation = os.path.normpath(os.path.join(output_path, "images", orientation))
-
-    if not os.path.exists(filepathOrientation):
-        os.makedirs(filepathOrientation)
+    # Step 3: create folders
+    create_folders(output_path, orientation)
 
     # Step 4: Process and save each slice
+    save_images(slices, output_path, orientation, total_dicom_images)
+
+    # Step 5: Save metadata JSON
+    json.dump(data_json, open(output_path + '/data.json', 'w'), indent=5, sort_keys=True)
+
+    if len(slices) > 0:
+        print(f"Step 5 distance: {distance}")
+        return orientation, slices[0].PixelSpacing[0], slices[0].PixelSpacing[1], distance
+    else:
+        return "unknown", 1.0, 1.0, 1.0
+
+@staticmethod
+def save_images(slices, output_path, orientation, total_dicom_images):
+    # Initial progress indicator (0%)
+    progress_counter = 0
+
     for idx, slice in enumerate(slices):
         try:
             Output_Image = slice.pixel_array
@@ -83,6 +91,19 @@ def convert_dicom_to_images(input_path: str, output_path: str) -> Tuple[str, flo
                 Output_Image = np.clip((Output_Image - p1) / (p99 - p1) * 255, 0, 255).astype(np.uint8)
             else:
                 Output_Image = np.clip(Output_Image, 0, 255).astype(np.uint8)
+
+            coord_system = detect_coordinate_system(list(map(float, slice.ImageOrientationPatient)))
+            print(f"coordinate system: {coord_system}")
+
+            # Flip nach Orientierung und LPS-Koordinatensystem
+            if coord_system == "LPS":
+                print("flip!!!")
+                if orientation.lower() =="transversal":
+                    Output_Image = np.flip(Output_Image, axis=1)  # horizontal
+                if orientation.lower() == "coronal":
+                    Output_Image = np.flip(Output_Image, axis=1)  # horizontal
+                if orientation.lower() == "sagittal":
+                    Output_Image = np.flip(Output_Image, axis=0)  # vertikal
 
             # Stelle sicher, dass der Zielordner existiert
             save_dir = os.path.normpath(os.path.join(output_path, "images", orientation))
@@ -112,10 +133,38 @@ def convert_dicom_to_images(input_path: str, output_path: str) -> Tuple[str, flo
             print(f"Error processing slice: {e}")
             continue
 
-    # Step 5: Save metadata JSON
-    json.dump(data_json, open(output_path + '/data.json', 'w'), indent=5, sort_keys=True)
+@staticmethod
+def create_folders(output_path, orientation):
+    # Step 3.1: Create images folder
+    filepathImages = os.path.normpath(os.path.join(output_path, "images"))
 
-    if len(slices) > 0:
-        return orientation, slices[0].PixelSpacing[0], slices[0].PixelSpacing[1], slices[0].SliceThickness
-    else:
-        return "unknown", 1.0, 1.0, 1.0
+    if not os.path.exists(filepathImages):
+        os.makedirs(filepathImages)
+    # Step 3.2: Create orientation folder
+    filepathOrientation = os.path.normpath(os.path.join(output_path, "images", orientation))
+
+    if not os.path.exists(filepathOrientation):
+        os.makedirs(filepathOrientation)
+
+
+def detect_coordinate_system(iop) -> str:
+    row_cosine = np.array(iop[0:3])
+    col_cosine = np.array(iop[3:6])
+
+    def direction_label(vec):
+        label = ""
+        label += "R" if vec[0] < 0 else "L"
+        label += "A" if vec[1] < 0 else "P"
+        label += "S" if vec[2] > 0 else "I"
+        return label
+
+    row_dir = direction_label(row_cosine)
+    col_dir = direction_label(col_cosine)
+    normal = np.cross(row_cosine, col_cosine)
+    norm_dir = direction_label(normal)
+
+    # Neue Heuristik erkennt RAS zuverlässiger
+    if any(k in row_dir + col_dir for k in ["R", "A"]):
+        return "RAS"
+    return "LPS"
+
