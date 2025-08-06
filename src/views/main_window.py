@@ -694,10 +694,11 @@ class MainWindow(QMainWindow):
             subprocess.run(['open', import_path])
 
     def reduce_vertices(self, model):
+        vertex_target = 100000
         vertex_count = len(model.data.vertices)
-        if vertex_count > 100000:
-            target_ratio = 100000 / vertex_count
-            print(f"🔧 Reduziere '{model.name}' von {vertex_count} auf ~100000 Vertices (Ratio: {target_ratio:.4f})")
+        if vertex_count > vertex_target:
+            target_ratio = vertex_target / vertex_count
+            print(f"🔧 Reduziere '{model.name}' von {vertex_count} auf ~{vertex_target} Vertices (Ratio: {target_ratio:.4f})")
             decimate_mod = model.modifiers.new(name='Decimate', type='DECIMATE')
             decimate_mod.ratio = target_ratio
             bpy.ops.object.modifier_apply(modifier=decimate_mod.name)
