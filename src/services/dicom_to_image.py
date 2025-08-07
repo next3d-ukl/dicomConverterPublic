@@ -38,6 +38,18 @@ def convert_dicom_to_images(input_path: str, output_path: str) -> Tuple[str, flo
     data_json = {}
     orientation = "unknown"
 
+    # Step 1.5 Sortierung
+    # Detect if coord-sys is LPS or RAS
+    coord_system = detect_coordinate_system(list(map(float, slices[0].ImageOrientationPatient)))
+    print(f"coordinate system: {coord_system}")
+
+    if coord_system == "LPS":
+        # Sortiere nach Z-Position
+        try:
+            slices.sort(key=lambda s: float(s.ImagePositionPatient[2]))
+        except AttributeError:
+            print("⚠️ Keine Z-Position verfügbar – Sortierung nicht möglich.")
+
     # Step 2: Extract metadata
     if len(slices) > 0:
         try:
@@ -91,19 +103,6 @@ def save_images(slices, output_path, orientation, total_dicom_images):
                 Output_Image = np.clip((Output_Image - p1) / (p99 - p1) * 255, 0, 255).astype(np.uint8)
             else:
                 Output_Image = np.clip(Output_Image, 0, 255).astype(np.uint8)
-
-            coord_system = detect_coordinate_system(list(map(float, slice.ImageOrientationPatient)))
-            print(f"coordinate system: {coord_system}")
-
-            # Flip nach Orientierung und LPS-Koordinatensystem
-            if coord_system == "LPS":
-                print("flip!!!")
-                if orientation.lower() =="transversal":
-                    Output_Image = np.flip(Output_Image, axis=1)  # horizontal
-                if orientation.lower() == "coronal":
-                    Output_Image = np.flip(Output_Image, axis=1)  # horizontal
-                if orientation.lower() == "sagittal":
-                    Output_Image = np.flip(Output_Image, axis=0)  # vertikal
 
             # Stelle sicher, dass der Zielordner existiert
             save_dir = os.path.normpath(os.path.join(output_path, "images", orientation))
