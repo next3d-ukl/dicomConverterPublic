@@ -694,7 +694,7 @@ class MainWindow(QMainWindow):
             subprocess.run(['open', import_path])
 
     def reduce_vertices(self, model):
-        vertex_target = 100000
+        vertex_target = 50000
         vertex_count = len(model.data.vertices)
         if vertex_count > vertex_target:
             target_ratio = vertex_target / vertex_count
@@ -769,7 +769,7 @@ class MainWindow(QMainWindow):
             else:
                 color = colorList.defaultColor_opaque()
                 alpha = colorList.defaultAlpha_opaque()
-            mat = self.get_or_create_material("default", color, alpha)
+            mat = self.get_or_create_material(f"{name_lower}_material", color, alpha)
             print("couldn't identify, setting default color")
 
         if model.data.materials:
