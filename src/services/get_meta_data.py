@@ -19,13 +19,7 @@ def get_meta_from_slice(slice, thickness) -> Dict[str, Any]:
 
     if modality != 'PR' and modality != 'SR':
         if modality == 'MR':
-            if 'DERIVED' in slice.get(0x00080008).value:
-                try:
-                    spacing = multivalue_to_list(slice.get(0x00280030).value)
-                    data_json = {'spacing': spacing}
-                except:
-                    pass
-            else:
+            if True:
                 rows = slice.get(0x00280010).value
                 cols = slice.get(0x00280011).value
 
@@ -41,14 +35,11 @@ def get_meta_from_slice(slice, thickness) -> Dict[str, Any]:
                 
                 data_json = {'rows': rows, 'cols': cols, 'pos': pos, 'direction': direction, 'spacing': spacing,
                              'slice_thickness': thickness}
+                print("######################################################")
+                print(data_json)
+                print("######################################################")
         elif modality == 'CT':
-            if 'DERIVED' in slice.get(0x00080008).value:
-                try:
-                    spacing = multivalue_to_list(slice.get(0x00280030).value)
-                    data_json = {'spacing': spacing}
-                except:
-                    pass
-            else:
+            if True:
                 rows = slice.get(0x00280010).value
                 cols = slice.get(0x00280011).value
 
@@ -64,4 +55,8 @@ def get_meta_from_slice(slice, thickness) -> Dict[str, Any]:
 
                 data_json = {'rows': rows, 'cols': cols, 'pos': pos, 'direction': direction, 'spacing': spacing,
                              'slice_thickness': thickness}
+
+                print("######################################################")
+                print(data_json)
+                print("######################################################")
     return data_json
