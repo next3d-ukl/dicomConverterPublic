@@ -1,5 +1,6 @@
 import os
 import json
+
 import numpy as np
 from PIL import Image
 from pydicom import dcmread
@@ -36,7 +37,9 @@ class DicomService:
         """
         #TODO: shall not be 0
         print(f"depth_spacing: {depth_spacing}, horizontal_spacing: {horizontal_spacing}")
-        multiplier = int(depth_spacing // horizontal_spacing)
+
+        multiplier = max(1,int(depth_spacing // horizontal_spacing))
+
         print(f"multiplier: {multiplier}")
         print("++++++++++++++++++++++++++++++++++++++++++++++++++")
 
@@ -46,6 +49,7 @@ class DicomService:
         new_width = 0
         new_height = 0
 
+        cnt = 1
         for path in image_paths:
             with Image.open(path) as img:
                 # Calculate the new dimensions
@@ -54,8 +58,12 @@ class DicomService:
                 new_width = int(old_width * (horizontal_spacing * multiplier / depth_spacing))
                 new_height = int(old_height * (vertical_spacing * multiplier / depth_spacing))
 
+                print(f"{cnt}/{len(image_paths)} Resizing {path}: {old_width}x{old_height} -> {new_width}x{new_height}")
                 resized_img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+
+
                 resized_img.save(path)
+                cnt += 1
 
         with open(json_path, 'r') as file:
             data = json.load(file)
@@ -244,7 +252,7 @@ class DicomService:
         # Step 2: Create column images (75% to 80%)
         column_result_images = DicomService.create_column_images(
             image_paths, 
-            int(depth_spacing // vertical_spacing),
+            max(1,int(depth_spacing // vertical_spacing)),
             base_orientation  # Pass the orientation for proper transformations
         )
         print(f"Calculated {columns_folder} images (column)")
@@ -253,7 +261,7 @@ class DicomService:
         # Step 3: Create row images (80% to 85%)
         row_result_images = DicomService.create_row_images(
             image_paths, 
-            int(depth_spacing // horizontal_spacing),
+            max(1,int(depth_spacing // horizontal_spacing)),
             base_orientation  # Pass the orientation for proper transformations
         )
         print(f"Calculated {rows_folder} images (row)")
