@@ -1,5 +1,6 @@
 import os
 import json
+
 import numpy as np
 from PIL import Image
 from pydicom import dcmread
@@ -17,6 +18,7 @@ class DicomService:
             
     @staticmethod
     def load_image_as_array(file_path: str) -> np.ndarray:
+        print("load_image_as_array")
         """
         Load image as a NumPy array
         """
@@ -28,16 +30,26 @@ class DicomService:
     def resize_input_images(json_path: str, image_paths: List[str], 
                           horizontal_spacing: float, vertical_spacing: float, 
                           depth_spacing: float) -> None:
+        print("++++++++++++++++++++++++++++++++++++++++++++++++++")
+        print("resize_input_images")
         """
         Resize input images for proper display
         """
-        multiplier = int(depth_spacing // horizontal_spacing)
+        #TODO: shall not be 0
+        print(f"depth_spacing: {depth_spacing}, horizontal_spacing: {horizontal_spacing}")
+
+        multiplier = max(1,int(depth_spacing // horizontal_spacing))
+
+        print(f"multiplier: {multiplier}")
+        print("++++++++++++++++++++++++++++++++++++++++++++++++++")
 
         # Calculate the new dimensions
+        print("Calculate the new dimensions")
         old_width, old_height = 0, 0
         new_width = 0
         new_height = 0
 
+        cnt = 1
         for path in image_paths:
             with Image.open(path) as img:
                 # Calculate the new dimensions
@@ -46,8 +58,12 @@ class DicomService:
                 new_width = int(old_width * (horizontal_spacing * multiplier / depth_spacing))
                 new_height = int(old_height * (vertical_spacing * multiplier / depth_spacing))
 
+                print(f"{cnt}/{len(image_paths)} Resizing {path}: {old_width}x{old_height} -> {new_width}x{new_height}")
                 resized_img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+
+
                 resized_img.save(path)
+                cnt += 1
 
         with open(json_path, 'r') as file:
             data = json.load(file)
@@ -60,11 +76,22 @@ class DicomService:
         data['lastImage']['spacing'] = [old_width / new_width * horizontal_spacing, old_height / new_height * vertical_spacing]
 
         # Write the updated JSON back to the file
+        print("Write the updated JSON back to the file")
+        print("QQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ")
+        print(f"data['firstImage']['cols']: {data['firstImage']['cols']}")
+        print(f"data['firstImage']['rows']: {data['firstImage']['rows']}")
+        print(f"data['firstImage']['spacing']: {data['firstImage']['spacing']}")
+        print(f"data['lastImage']['cols']: {data['lastImage']['cols']}")
+        print(f"data['lastImage']['rows']: {data['lastImage']['rows']}")
+        print(f"data['lastImage']['spacing']: {data['lastImage']['spacing']}")
+        print("QQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ")
+
         with open(json_path, 'w') as file:
             json.dump(data, file, indent=4)
 
     @staticmethod
     def create_column_images(image_paths: List[str], multiplier: int, orientation: str) -> List[np.ndarray]:
+        print("create_column_images")
         """
         Create column-based cross-sectional images
         
@@ -132,6 +159,7 @@ class DicomService:
 
     @staticmethod
     def create_row_images(image_paths: List[str], multiplier: int, orientation: str) -> List[np.ndarray]:
+        print("create_row_images")
         """
         Create row-based cross-sectional images
         
@@ -199,6 +227,7 @@ class DicomService:
     def process_cross_sections(output_folder: str, base_orientation: str, columns_folder: str, 
                               rows_folder: str, horizontal_spacing: float, 
                               vertical_spacing: float, depth_spacing: float) -> None:
+        print("process_cross_sections")
         """
         Process images to create cross-sectional views
         """
@@ -223,7 +252,7 @@ class DicomService:
         # Step 2: Create column images (75% to 80%)
         column_result_images = DicomService.create_column_images(
             image_paths, 
-            int(depth_spacing // vertical_spacing),
+            max(1,int(depth_spacing // vertical_spacing)),
             base_orientation  # Pass the orientation for proper transformations
         )
         print(f"Calculated {columns_folder} images (column)")
@@ -232,7 +261,7 @@ class DicomService:
         # Step 3: Create row images (80% to 85%)
         row_result_images = DicomService.create_row_images(
             image_paths, 
-            int(depth_spacing // horizontal_spacing),
+            max(1,int(depth_spacing // horizontal_spacing)),
             base_orientation  # Pass the orientation for proper transformations
         )
         print(f"Calculated {rows_folder} images (row)")
@@ -260,11 +289,16 @@ class DicomService:
 
     @staticmethod
     def run_conversion(input_path: str, output_path: str) -> DicomData:
+        print("run_conversion")
         """
         Run the complete DICOM conversion process and return data model
         """
         # Step 1: Convert DICOM to images
         orientation, horizontal_spacing, vertical_spacing, depth_spacing = convert_dicom_to_images(input_path, output_path)
+        print("RETURN VALUE convert_dicom_to_images(input_path, output_path)")
+        print("-------------------------------------------------------------")
+        print(f"orientation: {orientation}, horizontal_spacing: {horizontal_spacing}, vertical_spacing: {vertical_spacing}, depth_spacing: {depth_spacing}")
+        print("-------------------------------------------------------------")
         
         # Get derived orientation names
         columns_folder = DicomService.get_orientation_names(orientation)['columns']
@@ -299,6 +333,7 @@ class DicomService:
         
     @staticmethod
     def get_orientation_names(slice_orientation: str) -> Dict[str, str]:
+        print("get_orientation_names")
         """
         Get names of derived orientations based on slice orientation
         """

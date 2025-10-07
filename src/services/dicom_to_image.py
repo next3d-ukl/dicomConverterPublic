@@ -77,42 +77,55 @@ def convert_dicom_to_images(input_path: str, output_path: str) -> Tuple[str, flo
     # Step 5: Save metadata JSON
     json.dump(data_json, open(output_path + '/data.json', 'w'), indent=5, sort_keys=True)
 
+    # how the return is structured: orientation, horizontal_spacing, vertical_spacing, depth_spacing
+    print("DICOM TO IMAGE RETURN VALUES!!!!!!!!!!!!!!!!")
     if len(slices) > 0:
         print(f"Step 5 distance: {distance}")
+        print(f"orientation: {orientation}, horizontal_spacing{slices[0].PixelSpacing[0]}, vertical_spacing{slices[0].PixelSpacing[1]}, depth_spacing{distance}")
         return orientation, slices[0].PixelSpacing[0], slices[0].PixelSpacing[1], distance
     else:
+        print("DEFAULT VALUES")
         return "unknown", 1.0, 1.0, 1.0
 
 @staticmethod
 def save_images(slices, output_path, orientation, total_dicom_images):
+    print(f"Slices detected: {len(slices)}")
+    print(f"Total dicom images given: {total_dicom_images}")
     # Initial progress indicator (0%)
-    progress_counter = 0
 
     for idx, slice in enumerate(slices):
+        print(f"Slice {idx}: begin for loop")
         try:
+            print(f"Slice {idx}: try statement 1")
             Output_Image = slice.pixel_array
 
             # Apply VOI LUT for proper display
+            print(f"Slice {idx}: Apply VOI LUT for proper display")
             Output_Image = apply_voi_lut(Output_Image, slice)
 
             # Find the pixel values below which 1% and 99% of the data fall, respectively
+            print(f"Slice {idx}: Find the pixel values below which 1% and 99% of the data fall, respectively")
             p1, p99 = np.percentile(Output_Image, (1, 99))
 
             # Perform contrast stretching if possible
+            print(f"Slice {idx}: Perform contrast stretching if possible")
             if p99 != p1:
                 Output_Image = np.clip((Output_Image - p1) / (p99 - p1) * 255, 0, 255).astype(np.uint8)
             else:
                 Output_Image = np.clip(Output_Image, 0, 255).astype(np.uint8)
 
             # Stelle sicher, dass der Zielordner existiert
+            print(f"Slice {idx}: Stelle sicher, dass der Zielordner existiert")
             save_dir = os.path.normpath(os.path.join(output_path, "images", orientation))
             os.makedirs(save_dir, exist_ok=True)
 
-            filename = f'{slices.index(slice):04d}.png'
+            filename = f'{idx:04d}.png'
             filepath = os.path.normpath(os.path.join(save_dir, filename))
 
             try:
+                print(f"Slice {idx}: try statement 2")
                 # Bild speichern mit OpenCV, Fallback auf PIL
+                print(f"Slice {idx}: Bild speichern mit OpenCV, Fallback auf PIL")
                 success = cv.imwrite(filepath, Output_Image)
                 if not success:
                     try:
@@ -123,13 +136,11 @@ def save_images(slices, output_path, orientation, total_dicom_images):
                 print(f"Error saving image: {e}")
                 continue
 
-            # Update progress counter
-            progress_counter += 1
-
             # Show file progress
-            print(f"PROGRESS: {int(progress_counter / 2)} / {total_dicom_images}")
+            print(f"Slice {idx}: Show file progress")
+            print(f"PROGRESS: {idx + 1} / {total_dicom_images}")
         except Exception as e:
-            print(f"Error processing slice: {e}")
+            print(f"Error processing slice {idx}: {e}")
             continue
 
 @staticmethod
