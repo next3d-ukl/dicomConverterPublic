@@ -55,6 +55,9 @@ class DicomService:
                 # Calculate the new dimensions
                 old_width, old_height = img.size
 
+                print(f"horizontal_spacing: {horizontal_spacing}, vertical_spacing: {vertical_spacing}")
+                print(f"depth_spacing: {depth_spacing}")
+
                 new_width = int(old_width * (horizontal_spacing * multiplier / depth_spacing))
                 new_height = int(old_height * (vertical_spacing * multiplier / depth_spacing))
 
