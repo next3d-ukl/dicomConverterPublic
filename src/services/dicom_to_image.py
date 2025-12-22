@@ -100,8 +100,8 @@ def save_images(slices, output_path, orientation, total_dicom_images):
             Output_Image = slice.pixel_array
 
             # Apply VOI LUT for proper display
-            print(f"Slice {idx}: Apply VOI LUT for proper display")
-            Output_Image = apply_voi_lut(Output_Image, slice)
+            #print(f"Slice {idx}: Apply VOI LUT for proper display")
+            #Output_Image = apply_voi_lut(Output_Image, slice)
 
             # Find the pixel values below which 1% and 99% of the data fall, respectively
             print(f"Slice {idx}: Find the pixel values below which 1% and 99% of the data fall, respectively")
@@ -110,9 +110,14 @@ def save_images(slices, output_path, orientation, total_dicom_images):
             # Perform contrast stretching if possible
             print(f"Slice {idx}: Perform contrast stretching if possible")
             if p99 != p1:
-                Output_Image = np.clip((Output_Image - p1) / (p99 - p1) * 255, 0, 255).astype(np.uint8)
+                Output_Image = np.clip(
+                    (Output_Image - p1) / (p99 - p1) * 255,
+                    0,
+                    255
+                ).astype(np.uint8)
             else:
                 Output_Image = np.clip(Output_Image, 0, 255).astype(np.uint8)
+
 
             # Stelle sicher, dass der Zielordner existiert
             print(f"Slice {idx}: Stelle sicher, dass der Zielordner existiert")
