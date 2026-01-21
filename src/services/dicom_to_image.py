@@ -7,6 +7,7 @@ from typing import Tuple
 from PIL import Image
 
 from pydicom.pixel_data_handlers.util import apply_voi_lut
+from pydicom.multival import MultiValue
 
 from services.get_meta_data import get_meta_from_slice
 from services.slice_loading import load_slices
@@ -38,27 +39,24 @@ def convert_dicom_to_images(input_path: str, output_path: str) -> Tuple[str, flo
     data_json = {}
     orientation = "unknown"
 
-    # Step 1.5 Sortierung
-    # Detect if coord-sys is LPS or RAS
-    coord_system = detect_coordinate_system(list(map(float, slices[0].ImageOrientationPatient)))
-    print(f"coordinate system: {coord_system}")
+    # Print Meta Data of First Slice for Debugging
+    print(slices[0])
 
-    if coord_system == "LPS":
-        # Sortiere nach Z-Position
-        try:
-            slices.sort(key=lambda s: float(s.ImagePositionPatient[2]))
-        except AttributeError:
-            print("⚠️ Keine Z-Position verfügbar – Sortierung nicht möglich.")
+
+    # Step 1.5 Sortierung
+    try:
+        slices.sort(key=lambda s: float(s.ImagePositionPatient[2]))
+    except AttributeError:
+        print("⚠️ Keine Z-Position verfügbar – Sortierung nicht möglich.")
 
     # Step 2: Extract metadata
-    if len(slices) > 0:
+
+    if len(slices) > 1:
         try:
-            pos1 = np.array([float(x) for x in slices[0].ImagePositionPatient])
-            pos2 = np.array([float(x) for x in slices[1].ImagePositionPatient])
-            distance = np.linalg.norm(pos2 - pos1)
+            distance = abs(slices[0].ImagePositionPatient[2] - slices[1].ImagePositionPatient[2])
             print(f"Calculated Spacing: {distance}")
 
-            orientation = get_slice_orientation(slices[0])
+            orientation = get_slice_orientation(slices[0].ImageOrientationPatient)
             data_json['sliceOrientation'] = orientation
             data_json["firstImage"] = get_meta_from_slice(slices[0], distance)
             data_json["lastImage"] = get_meta_from_slice(slices[len(slices) - 1], distance)
@@ -78,14 +76,13 @@ def convert_dicom_to_images(input_path: str, output_path: str) -> Tuple[str, flo
     json.dump(data_json, open(output_path + '/data.json', 'w'), indent=5, sort_keys=True)
 
     # how the return is structured: orientation, horizontal_spacing, vertical_spacing, depth_spacing
-    print("DICOM TO IMAGE RETURN VALUES!!!!!!!!!!!!!!!!")
     if len(slices) > 0:
-        print(f"Step 5 distance: {distance}")
         print(f"orientation: {orientation}, horizontal_spacing{slices[0].PixelSpacing[0]}, vertical_spacing{slices[0].PixelSpacing[1]}, depth_spacing{distance}")
         return orientation, slices[0].PixelSpacing[0], slices[0].PixelSpacing[1], distance
     else:
         print("DEFAULT VALUES")
         return "unknown", 1.0, 1.0, 1.0
+
 
 @staticmethod
 def save_images(slices, output_path, orientation, total_dicom_images):
@@ -93,34 +90,41 @@ def save_images(slices, output_path, orientation, total_dicom_images):
     print(f"Total dicom images given: {total_dicom_images}")
     # Initial progress indicator (0%)
 
+    # Get Contrast from Dicom file
+    window_center = slices[0].WindowCenter
+    window_width = slices[0].WindowWidth
+    intercept = slices[0].RescaleIntercept
+
+    if isinstance(window_center, (list, tuple, MultiValue)):
+        window_center = window_center[0]
+
+    if isinstance(window_width, (list, tuple, MultiValue)):
+        window_width = window_width[0]
+
+
+
+    lower_bound = window_center - (window_width/2) - intercept
+
+
+    print(f"Bounds: {window_center}, {window_width}")
+
+
     for idx, slice in enumerate(slices):
-        print(f"Slice {idx}: begin for loop")
         try:
-            print(f"Slice {idx}: try statement 1")
-            Output_Image = slice.pixel_array
+            output_image = slice.pixel_array
 
-            # Apply VOI LUT for proper display
-            #print(f"Slice {idx}: Apply VOI LUT for proper display")
-            #Output_Image = apply_voi_lut(Output_Image, slice)
 
-            # Find the pixel values below which 1% and 99% of the data fall, respectively
-            print(f"Slice {idx}: Find the pixel values below which 1% and 99% of the data fall, respectively")
-            p1, p99 = np.percentile(Output_Image, (1, 99))
+            output_image = output_image - lower_bound
+            output_image = output_image * (255/window_width) * 0.95
 
-            # Perform contrast stretching if possible
-            print(f"Slice {idx}: Perform contrast stretching if possible")
-            if p99 != p1:
-                Output_Image = np.clip(
-                    (Output_Image - p1) / (p99 - p1) * 255,
+            output_image = np.clip(
+                output_image,
                     0,
                     255
                 ).astype(np.uint8)
-            else:
-                Output_Image = np.clip(Output_Image, 0, 255).astype(np.uint8)
 
 
             # Stelle sicher, dass der Zielordner existiert
-            print(f"Slice {idx}: Stelle sicher, dass der Zielordner existiert")
             save_dir = os.path.normpath(os.path.join(output_path, "images", orientation))
             os.makedirs(save_dir, exist_ok=True)
 
@@ -128,13 +132,11 @@ def save_images(slices, output_path, orientation, total_dicom_images):
             filepath = os.path.normpath(os.path.join(save_dir, filename))
 
             try:
-                print(f"Slice {idx}: try statement 2")
                 # Bild speichern mit OpenCV, Fallback auf PIL
-                print(f"Slice {idx}: Bild speichern mit OpenCV, Fallback auf PIL")
-                success = cv.imwrite(filepath, Output_Image)
+                success = cv.imwrite(filepath, output_image)
                 if not success:
                     try:
-                        Image.fromarray(Output_Image).save(filepath)
+                        Image.fromarray(output_image).save(filepath)
                     except Exception as e:
                         print(f"❌ Fehler beim Speichern mit PIL: {e}")
             except Exception as e:
@@ -142,10 +144,7 @@ def save_images(slices, output_path, orientation, total_dicom_images):
                 continue
 
             # Show file progress
-            print(f"Slice {idx}: Show file progress")
-            print(f"PROGRESS: {idx + 1} / {total_dicom_images}")
         except Exception as e:
-            print(f"Error processing slice {idx}: {e}")
             continue
 
 @staticmethod
@@ -163,6 +162,8 @@ def create_folders(output_path, orientation):
 
 
 def detect_coordinate_system(iop) -> str:
+    print(f"Cross Product: {np.cross(iop[0:3],iop[3:6])}")
+
     row_cosine = np.array(iop[0:3])
     col_cosine = np.array(iop[3:6])
 
