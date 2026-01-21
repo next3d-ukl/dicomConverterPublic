@@ -21,6 +21,7 @@ import subprocess
 import os
 import bpy
 import glob
+import shutil
 
 from models.color_list_class import ColorList
 
@@ -51,6 +52,9 @@ class MainWindow(QMainWindow):
 
         self.init_ui()
         self.init_menu()
+
+        self.on_dicom_folder_selected(self.input_folder)
+        self.update_start_button_state()
 
         # Redirect stdout and stderr with progress bar support
         sys.stdout = ConsoleRedirect(self.console_output, sys.stdout, self.progress_bar)
@@ -118,7 +122,7 @@ class MainWindow(QMainWindow):
 
         self.start_button = QPushButton("Start Conversion")
         self.start_button.clicked.connect(self.start_conversion)
-        self.start_button.setEnabled(False)  # Disabled until input and output folders are selected
+        self.start_button.setEnabled(True)  # Disabled until input and output folders are selected
         input_layout.addWidget(self.start_button)
 
         # Add progress bar
