@@ -6,4 +6,4 @@ numpy
 pyqtgraph
 numpy-stl
 PyOpenGL
-bpy
+bpy==4.0.0
