@@ -27,7 +27,7 @@ class MainViewModel(QObject):
         self.output_folder: str = ""
         
     @pyqtSlot(str, str)
-    def start_conversion(self, input_folder: str, output_folder: str) -> None:
+    def start_conversion(self, parent, input_folder: str, output_folder: str) -> None:
         """
         Start DICOM conversion in a separate thread
         """
@@ -68,19 +68,21 @@ class MainViewModel(QObject):
         self.conversion_started.emit()
         
         # Run conversion in a separate thread
-        thread = threading.Thread(
-            target=self._run_conversion_thread,
-            args=(input_folder, output_folder)
-        )
-        thread.daemon = True
-        thread.start()
+        self.run_conversion_thread(parent, input_folder, output_folder)
+        
+        #thread = threading.Thread(
+        #    target=self._run_conversion_thread,
+        #    args=(parent, input_folder, output_folder)
+        #)
+        #thread.daemon = True
+        #thread.start()
     
-    def _run_conversion_thread(self, input_folder: str, output_folder: str) -> None:
+    def run_conversion_thread(self, parent, input_folder: str, output_folder: str) -> None:
         """
         Thread function to run conversion
         """
         try:
-            self.dicom_data = DicomService.run_conversion(input_folder, output_folder)
+            self.dicom_data = DicomService.run_conversion(parent,input_folder, output_folder)
             self.conversion_completed.emit(self.dicom_data)
         except Exception as e:
             self.conversion_failed.emit(f"Conversion failed: {str(e)}")

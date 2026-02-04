@@ -1,5 +1,6 @@
 import json
 import os
+from PyQt5.QtWidgets import QDialog
 import numpy as np
 import cv2 as cv
 
@@ -12,10 +13,11 @@ from pydicom.multival import MultiValue
 from services.get_meta_data import get_meta_from_slice
 from services.slice_loading import load_slices
 from services.slice_orientation import get_slice_orientation
+from views.contrast_adjustment import ContrastDialog
 
 
 @staticmethod
-def convert_dicom_to_images(input_path: str, output_path: str) -> Tuple[str, float, float, float]:
+def convert_dicom_to_images(parent, input_path: str, output_path: str) -> Tuple[str, float, float, float]:
     """
     Convert DICOM files to images and save metadata
     Returns: orientation, horizontal_spacing, vertical_spacing, depth_spacing
@@ -70,7 +72,7 @@ def convert_dicom_to_images(input_path: str, output_path: str) -> Tuple[str, flo
     create_folders(output_path, orientation)
 
     # Step 4: Process and save each slice
-    save_images(slices, output_path, orientation, total_dicom_images)
+    save_images(parent, slices, output_path, orientation, total_dicom_images)
 
     # Step 5: Save metadata JSON
     json.dump(data_json, open(output_path + '/data.json', 'w'), indent=5, sort_keys=True)
@@ -85,7 +87,7 @@ def convert_dicom_to_images(input_path: str, output_path: str) -> Tuple[str, flo
 
 
 @staticmethod
-def save_images(slices, output_path, orientation, total_dicom_images):
+def save_images(parent, slices, output_path, orientation, total_dicom_images):
     print(f"Slices detected: {len(slices)}")
     print(f"Total dicom images given: {total_dicom_images}")
     # Initial progress indicator (0%)
@@ -100,6 +102,12 @@ def save_images(slices, output_path, orientation, total_dicom_images):
 
     if isinstance(window_width, (list, tuple, MultiValue)):
         window_width = window_width[0]
+
+    # Adjust Contrast
+
+    contrast_object = ContrastObject(parent, slices, window_center, window_width, intercept)
+    window_width = contrast_object.window_width
+    window_center = contrast_object.window_center
 
 
 
@@ -176,11 +184,30 @@ def detect_coordinate_system(iop) -> str:
 
     row_dir = direction_label(row_cosine)
     col_dir = direction_label(col_cosine)
-    normal = np.cross(row_cosine, col_cosine)
-    norm_dir = direction_label(normal)
 
     # Neue Heuristik erkennt RAS zuverlässiger
     if any(k in row_dir + col_dir for k in ["R", "A"]):
         return "RAS"
     return "LPS"
 
+
+class ContrastObject():
+    def __init__(self, parent, slices, window_center, window_width, intercept):
+        self.window_center = window_center
+        self.window_width = window_width
+        self.open_contrast_adjustment_dialog(parent, slices, window_center, window_width, intercept)
+
+    def update_contrast_values(self, v1,v2):
+        self.window_center = v1
+        self.window_width = v2
+
+    def open_contrast_adjustment_dialog(self, parent, slices, window_center, window_width, intercept):
+        dialog = ContrastDialog(parent, slices, window_center, window_width, intercept)
+        dialog.valuesSelected.connect(self.update_contrast_values)
+        dialog.exec_()
+
+    def get_window_center(self):
+        return self.window_center
+
+    def get_window_width(self):
+        return self.window_width

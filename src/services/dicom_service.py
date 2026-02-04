@@ -234,13 +234,14 @@ class DicomService:
         print("Conversion finished!")
 
     @staticmethod
-    def run_conversion(input_path: str, output_path: str) -> DicomData:
+    def run_conversion(parent, input_path: str, output_path: str) -> DicomData:
         print("run_conversion")
         """
         Run the complete DICOM conversion process and return data model
         """
         # Step 1: Convert DICOM to images
-        orientation, horizontal_spacing, vertical_spacing, depth_spacing = convert_dicom_to_images(input_path, output_path)
+        # Open here image
+        orientation, horizontal_spacing, vertical_spacing, depth_spacing = convert_dicom_to_images(parent, input_path, output_path)
         print("RETURN VALUE convert_dicom_to_images(input_path, output_path)")
         print("-------------------------------------------------------------")
         print(f"orientation: {orientation}, horizontal_spacing: {horizontal_spacing}, vertical_spacing: {vertical_spacing}, depth_spacing: {depth_spacing}")
@@ -293,3 +294,4 @@ class DicomService:
             return direction_map[slice_orientation]
         else:
             return {"rows": "rows", "columns": "columns"}
+

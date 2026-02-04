@@ -375,7 +375,7 @@ class MainWindow(QMainWindow):
 
     def start_conversion(self):
         """Start the DICOM conversion process"""
-        self.view_model.start_conversion(self.input_folder, self.output_folder)
+        self.view_model.start_conversion(self, self.input_folder, self.output_folder)
 
     def load_stl(self):
         """Load an STL file for 3D visualization"""
@@ -478,6 +478,7 @@ class MainWindow(QMainWindow):
         # If the error was about the output folder not being empty, open folder picker
         if "Output folder must be empty" in error_message:
             self.select_output_folder()
+
     
     @pyqtSlot(np.ndarray, np.ndarray)
     def on_stl_loaded(self, vertices: np.ndarray, faces: np.ndarray):
