@@ -7,3 +7,4 @@ pyqtgraph
 numpy-stl
 PyOpenGL
 bpy
+SimpleITK

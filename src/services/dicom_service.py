@@ -1,297 +1,179 @@
-import os
 import json
+import os
 
-from cv2.gapi import mul
+import SimpleITK as sitk
 import numpy as np
-from PIL import Image
-from pydicom import dcmread
-from typing import List, Dict, Tuple, Any, Optional
 
 from models.dicom_data import DicomData
 
-from services.dicom_to_image import convert_dicom_to_images
+from views.contrast_adjustment import ImageDialog
 
 
 class DicomService:
     """
     Service class for DICOM related operations
     """
-            
-    @staticmethod
-    def load_image_as_array(file_path: str) -> np.ndarray:
-        print("load_image_as_array")
-        """
-        Load image as a NumPy array
-        """
-        img = Image.open(file_path).convert('L')  # Convert to grayscale
-        img_array = np.array(img)
-        return img_array
-
-
-    @staticmethod
-    def create_column_images(image_paths: List[str], multiplier: float, orientation: str) -> List[np.ndarray]:
-        print("create_column_images")
-        """
-        Create column-based cross-sectional images
-        
-        Args:
-            image_paths: List of paths to input images
-            multiplier: Scaling factor for image creation
-            orientation: The orientation of the input images ('transversal', 'sagittal', or 'coronal')
-            
-        Returns:
-            List of cross-sectional images as NumPy arrays
-        """
-        # Determine sort order based on orientation
-        sort_reverse = True
-        if orientation == "sagittal":
-            # For sagittal inputs, we need forward order for proper results
-            sort_reverse = False
-            
-        # Sort image paths according to orientation needs
-        image_paths.sort(reverse=sort_reverse)
-
-        # Load and resize all input images
-        images = [Image.open(path).convert('L') for path in image_paths]
-        images = [np.array(img) for img in images]
-        
-        # Ensure all images are of identical size
-        for img in images:
-            if img.shape != images[0].shape:
-                raise ValueError("All images must be of the same size")
-        
-        # Get the dimensions of the images
-        height, width = images[0].shape
-        
-        # Create a list to store the result images
-        result_images = []
-        
-        # Create result images for each column index
-        for col_index in range(width):
-            # Create an empty array for the new image
-            new_img = np.zeros((height, int(len(images) * multiplier)), dtype=images[0].dtype)
-            
-            # Populate the new image array with the specific column from each input image
-
-            length = len(images)
-
-            for img_index in range(int(length * multiplier)):
-                # Interpolate between images
-                layer = int((img_index - multiplier / 2) / multiplier)
-                img_before = images[min(length-1,max(0,layer))][:,col_index]
-                img_after = images[min(length-1,max(0,layer+1))][:,col_index]
-                alpha = ((img_index - (multiplier / 2)) % multiplier) / multiplier
-                img = img_before * (1-alpha) + img_after * alpha
-                new_img[:, img_index] = img[:]
-            
-            # Transpose the new image to swap rows and columns
-            new_img = np.transpose(new_img, (1, 0))
-            
-            # Apply orientation-specific transformations
-            if orientation == "coronal":
-                # For coronal inputs, rotate sagittal output 90 degrees clockwise
-                new_img = np.rot90(new_img, k=3)  # k=3 is 270 degrees = 90 degrees clockwise
-            elif orientation == "sagittal":
-                # For sagittal inputs, rotate coronal output 90 degrees clockwise
-                new_img = np.rot90(new_img, k=3)  # k=3 is 270 degrees = 90 degrees clockwise
-            
-            # Add the new image to the result list
-            result_images.append(new_img)
-        
-        # Apply orientation-specific result order
-        if orientation in ["transversal", "coronal"]:
-            result_images.reverse()
-        
-        return result_images
-
-    @staticmethod
-    def create_row_images(image_paths: List[str], multiplier: float, orientation: str) -> List[np.ndarray]:
-        print("create_row_images")
-        """
-        Create row-based cross-sectional images
-        
-        Args:
-            image_paths: List of paths to input images
-            multiplier: Scaling factor for image creation
-            orientation: The orientation of the input images ('transversal', 'sagittal', or 'coronal')
-            
-        Returns:
-            List of cross-sectional images as NumPy arrays
-        """
-        # Determine sort order based on orientation
-        sort_reverse = False  # Default is standard order
-        
-        # Sort image paths according to orientation needs
-        # For coronal inputs, transversal output should be in default order
-        image_paths.sort(reverse=sort_reverse)
-        
-        # Load and resize all input images
-        images = [Image.open(path).convert('L') for path in image_paths]
-        images = [np.array(img) for img in images]
-        
-        # Ensure all images are of identical size
-        for img in images:
-            if img.shape != images[0].shape:
-                raise ValueError("All images must be of the same size")
-        
-        # Get the dimensions of the images
-        height, width = images[0].shape
-        
-        # Create a list to store the result images
-        result_images = []
-        
-        # Create result images for each row index
-        for row_index in range(height):
-            # Create an empty array for the new image
-            new_img = np.zeros((int(len(images) * multiplier), width), dtype=images[0].dtype)
-            
-            # Populate the new image array with the specific row from each input image
-            length = len(images)
-
-            for img_index in range(int(length * multiplier)):
-                # Interpolate between images
-                layer = int((img_index - multiplier / 2) / multiplier)
-                img_before = images[min(length-1,max(0,layer))][row_index,:]
-                img_after = images[min(length-1,max(0,layer+1))][row_index,:]
-                alpha = ((img_index - (multiplier / 2)) % multiplier) / multiplier
-                img = img_before * (1-alpha) + img_after * alpha
-                new_img[img_index,:] = img[:]
-            
-            # Apply orientation-specific transformations
-            if orientation == "transversal":
-                # For transversal inputs, flip coronal output vertically
-                new_img = np.flipud(new_img)
-            elif orientation == "sagittal":
-                new_img = np.rot90(new_img, k=3)  # k=3 is 270 degrees = 90 degrees clockwise
-
-            # Add the new image to the result list
-            result_images.append(new_img)
-        
-        # Reverse the result order for specific orientations
-        if orientation == "coronal":
-            # For coronal inputs, reverse the order of transversal images
-            result_images.reverse()
-        elif orientation == "sagittal":
-            # For sagittal inputs, reverse the order of transversal images
-            result_images.reverse()
-            
-        return result_images
-
-    @staticmethod
-    def process_cross_sections(output_folder: str, base_orientation: str, columns_folder: str, 
-                              rows_folder: str, horizontal_spacing: float, 
-                              vertical_spacing: float, depth_spacing: float) -> None:
-        print("process_cross_sections")
-        """
-        Process images to create cross-sectional views
-        """
-        # Get all image paths from the input folder and sort them alphabetically
-        image_paths = sorted([
-            os.path.normpath(os.path.join(output_folder, "images", base_orientation, f))
-            for f in os.listdir(os.path.normpath(os.path.join(output_folder, "images", base_orientation)))
-            if f.endswith(('png', 'jpg', 'jpeg'))
-        ])
-
-        # Keep Original Size of Images
-        print(f"PROGRESS: 75 / 100")  # Signal 75% progress after resizing
-
-        # Step 2: Create column images (75% to 80%)
-        column_result_images = DicomService.create_column_images(
-            image_paths, 
-            depth_spacing / vertical_spacing,
-            base_orientation  # Pass the orientation for proper transformations
-        )
-        print(f"Calculated {columns_folder} images (column)")
-        print(f"PROGRESS: 80 / 100")  # Signal 80% progress
-
-        # Step 3: Create row images (80% to 85%)
-        row_result_images = DicomService.create_row_images(
-            image_paths, 
-            depth_spacing / vertical_spacing,
-            base_orientation  # Pass the orientation for proper transformations
-        )
-        print(f"Calculated {rows_folder} images (row)")
-        print(f"PROGRESS: 85 / 100")  # Signal 85% progress
-        
-        # Ensure output directories exist
-        os.makedirs(output_folder + "/images/" + columns_folder, exist_ok=True)
-        os.makedirs(output_folder + "/images/" + rows_folder, exist_ok=True)
-
-        # Step 4: Save column images (85% to 90%)
-        for i, result_image in enumerate(column_result_images):
-            result_img_pil = Image.fromarray(result_image)
-            result_img_pil.save(os.path.normpath(os.path.join(output_folder + "/images/" + columns_folder, f'{i:04d}.png')))
-        print(f"Saved {columns_folder} images")
-        print(f"PROGRESS: 90 / 100")  # Signal 90% progress
-
-        # Step 5: Save row images (90% to 95%)
-        for i, result_image in enumerate(row_result_images):
-            result_img_pil = Image.fromarray(result_image)
-            result_img_pil.save(os.path.normpath(os.path.join(output_folder + "/images/" + rows_folder, f'{i:04d}.png')))
-        print(f"Saved {rows_folder} images")
-        print(f"PROGRESS: 95 / 100")  # Signal 95% progress at the end
-        
-        print("Conversion finished!")
-
     @staticmethod
     def run_conversion(parent, input_path: str, output_path: str) -> DicomData:
         print("run_conversion")
         """
         Run the complete DICOM conversion process and return data model
         """
-        # Step 1: Convert DICOM to images
-        # Open here image
-        orientation, horizontal_spacing, vertical_spacing, depth_spacing = convert_dicom_to_images(parent, input_path, output_path)
-        print("RETURN VALUE convert_dicom_to_images(input_path, output_path)")
-        print("-------------------------------------------------------------")
-        print(f"orientation: {orientation}, horizontal_spacing: {horizontal_spacing}, vertical_spacing: {vertical_spacing}, depth_spacing: {depth_spacing}")
-        print("-------------------------------------------------------------")
-        
-        # Get derived orientation names
-        columns_folder = DicomService.get_orientation_names(orientation)['columns']
-        rows_folder = DicomService.get_orientation_names(orientation)['rows']
 
-        # Step 2: Process cross sections
-        DicomService.process_cross_sections(
-            output_path, orientation, columns_folder, rows_folder, 
-            horizontal_spacing, vertical_spacing, depth_spacing
-        )
-        
-        # Step 3: Create and populate data model
+
+        file_reader = sitk.ImageSeriesReader()
+
+        file_reader.MetaDataDictionaryArrayUpdateOn()
+        file_reader.LoadPrivateTagsOn()
+
+        dicom_names = file_reader.GetGDCMSeriesFileNames(input_path)
+        file_reader.SetFileNames(dicom_names)
+        image_3d = file_reader.Execute()
+        image_3d = sitk.DICOMOrient(image_3d, 'LPS')
+        image_3d = resample_to_isotropic(image_3d)
+        image_3d = sitk.Flip(image_3d, [False, False, True])
+
+
+        window_width = [float(x.strip()) for x in file_reader.GetMetaData(0, "0028|1051").strip().split('\\')][0]
+        window_center = [float(x.strip()) for x in file_reader.GetMetaData(0, "0028|1050").strip().split('\\')][0]
+        image_dialog = ImageWindowObject(parent, image_3d, window_center, window_width, 0)
+        window_width = image_dialog.window_width
+        window_center = image_dialog.window_center
+
+
+        window_min = window_center - window_width // 2
+        window_max = window_center + window_width // 2
+
+        # Count Images to Display Progess Bar
+        counter = 0
+        max_count = image_3d.GetSize()[0] + image_3d.GetSize()[1] + image_3d.GetSize()[2]
+        counter = safe_axis(sitk.Flip(image_3d, [False, True, False]), output_path, "coronal", 1, window_min, window_max, parent, counter, max_count)
+        counter = safe_axis(image_3d, output_path, "sagittal", 0, window_min, window_max, parent, counter, max_count)
+        counter = safe_axis(sitk.Flip(image_3d, [False, False, True]), output_path, "transversal", 2, window_min, window_max, parent, counter, max_count)
+
+        # Get Orientation
+        direction = np.array(image_3d.GetDirection()).tolist()
+
+        spacing = np.array(image_3d.GetSpacing()).tolist()
+
+        # Save Info to Json
+        data_json = {}
+
+
+        firstPosition = [float(x.strip()) for x in file_reader.GetMetaData(0, "0020|0032").split('\\')]
+        lastPosition = [float(x.strip()) for x in file_reader.GetMetaData(len(dicom_names)- 1, "0020|0032").split('\\')]
+
+        data_json['firstImage'] = {
+            'rows': image_3d.GetSize()[1],
+            'cols': image_3d.GetSize()[0],
+            'pos': firstPosition,
+            'direction': direction, 
+            'spacing': spacing[0:2],
+            'slice_thickness': spacing[2]
+        }
+        data_json['lastImage'] = {
+            'rows': image_3d.GetSize()[1],
+            'cols': image_3d.GetSize()[0],
+            'pos': lastPosition,
+            'direction': direction, 
+            'spacing': spacing[0:2],
+            'slice_thickness': spacing[2]
+        }
+
+        # Calculate Orientation based on first and last Position
+        diff = np.abs(np.array(lastPosition) - np.array(firstPosition))
+        orientation = "transversal"
+        if diff.argmax() == 0:
+            orientation = "sagittal"
+        elif diff.argmax() == 1:
+            orientation = "coronal"
+        elif diff.argmax() == 2:
+            orientation = "transversal"
+        data_json['sliceOrientation'] = orientation
+
+        json.dump(data_json, open(output_path + '/data.json', 'w'), indent=5, sort_keys=True)
+
         model = DicomData(
-            slice_orientation=orientation,
-            spacing=(horizontal_spacing, vertical_spacing, depth_spacing),
+            slice_orientation=direction,
+            spacing=(spacing[0], spacing[1], spacing[2]),
             input_folder=input_path,
             output_folder=output_path
         )
         
-        # Load metadata
-        try:
-            with open(output_path + '/data.json', 'r') as f:
-                data = json.load(f)
-                if "firstImage" in data:
-                    model.first_image_metadata = data["firstImage"]
-                if "lastImage" in data:
-                    model.last_image_metadata = data["lastImage"]
-        except (FileNotFoundError, json.JSONDecodeError):
-            print("Error loading metadata from data.json")
-        
         return model
-        
-    @staticmethod
-    def get_orientation_names(slice_orientation: str) -> Dict[str, str]:
-        print("get_orientation_names")
-        """
-        Get names of derived orientations based on slice orientation
-        """
-        direction_map = {
-            "transversal": {"rows": "coronal", "columns": "sagittal"},
-            "sagittal": {"rows": "transversal", "columns": "coronal"},
-            "coronal": {"rows": "transversal", "columns": "sagittal"}
-        }
-        
-        if slice_orientation in direction_map:
-            return direction_map[slice_orientation]
-        else:
-            return {"rows": "rows", "columns": "columns"}
+
+def safe_axis(image_3d, filepath, axis_name, axis, window_min, window_max, parent, counter, max_count):
+    folder = os.path.join(filepath, "images", axis_name)
+    os.makedirs(folder,exist_ok=True)
+    for i in range(image_3d.GetSize()[axis]):
+
+        counter += 1
+        parent.progress_bar.setValue(int(counter/max_count * 100))
+
+        slice = get_slice(image_3d,i,axis)
+        img_255 = sitk.IntensityWindowing(slice,window_min, window_max, 0, 255)
+        img_8bit = sitk.Cast(img_255, sitk.sitkUInt8)
+        out_filepath = os.path.normpath(os.path.join(folder, f"image{i}.png"))
+        sitk.WriteImage(img_8bit, out_filepath)
+    return counter
+
+    
+def get_slice(volume, index, axis=2):
+    extract = sitk.ExtractImageFilter()
+    
+    size = list(volume.GetSize())
+    size[axis] = 0 
+    extract.SetSize(size)
+    
+    start_index = [0, 0, 0]
+    start_index[axis] = index
+    extract.SetIndex(start_index)
+    
+    return extract.Execute(volume)
+
+def resample_to_isotropic(image):
+    # Aktuelles Spacing und Größe 
+    original_spacing = image.GetSpacing()
+    original_size = image.GetSize()
+    
+    # Neues Spacing festlegen (1.0 mm in alle Richtungen)
+    new_spacing = [1.0, 1.0, 1.0]
+    
+    # Neue Größe berechnen, damit das physische Volumen gleich bleibt
+    new_size = [
+        int(round(original_size[0] * (original_spacing[0] / new_spacing[0]))),
+        int(round(original_size[1] * (original_spacing[1] / new_spacing[1]))),
+        int(round(original_size[2] * (original_spacing[2] / new_spacing[2])))
+    ]
+    
+    resampler = sitk.ResampleImageFilter()
+    resampler.SetSize(new_size)
+    resampler.SetOutputSpacing(new_spacing)
+    resampler.SetOutputOrigin(image.GetOrigin())
+    resampler.SetOutputDirection(image.GetDirection())
+    resampler.SetInterpolator(sitk.sitkLinear) # Linear für schnell & gut
+    
+    return resampler.Execute(image)
+
+class ImageWindowObject():
+    def __init__(self, parent, slices, window_center, window_width, intercept):
+        self.window_center = window_center
+        self.window_width = window_width
+        self.open_contrast_adjustment_dialog(parent, slices, window_center, window_width, intercept)
+
+    def update_contrast_values(self, v1,v2):
+        self.window_center = v1
+        self.window_width = v2
+
+    def open_contrast_adjustment_dialog(self, parent, slices, window_center, window_width, intercept):
+        dialog = ImageDialog(parent, slices, window_center, window_width)
+        dialog.valuesSelected.connect(self.update_contrast_values)
+        dialog.exec_()
+
+    def get_window_center(self):
+        return self.window_center
+
+    def get_window_width(self):
+        return self.window_width
+
 
