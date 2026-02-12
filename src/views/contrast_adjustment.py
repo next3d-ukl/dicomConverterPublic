@@ -175,8 +175,8 @@ class ImageDialog(QDialog):
         # 1. Intensity Windowing (Medical values -> 0-255)
         img_255 = sitk.IntensityWindowing(
             sitk_slice, 
-            window_center - window_width / 2, 
-            window_center + window_width / 2, 
+            max(0, window_center - window_width / 2), 
+            min(3000, window_center + window_width / 2), 
             0.0, 255.0
         )
         

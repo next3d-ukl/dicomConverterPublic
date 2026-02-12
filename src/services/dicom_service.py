@@ -41,8 +41,8 @@ class DicomService:
         window_center = image_dialog.window_center
 
 
-        window_min = window_center - window_width // 2
-        window_max = window_center + window_width // 2
+        window_min = max(0, window_center - window_width // 2)
+        window_max = min(3000, window_center + window_width // 2)
 
         # Count Images to Display Progess Bar
         counter = 0
