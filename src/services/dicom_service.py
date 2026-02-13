@@ -6,6 +6,7 @@ import numpy as np
 
 from models.dicom_data import DicomData
 
+from services.get_slice import get_slice
 from views.contrast_adjustment import ImageDialog
 
 
@@ -29,16 +30,20 @@ class DicomService:
         dicom_names = file_reader.GetGDCMSeriesFileNames(input_path)
         file_reader.SetFileNames(dicom_names)
         image_3d = file_reader.Execute()
-        image_3d = sitk.DICOMOrient(image_3d, 'LPS')
+        orientation = "RAS"
+        image_3d = sitk.DICOMOrient(image_3d, orientation)
         image_3d = resample_to_isotropic(image_3d)
-        image_3d = sitk.Flip(image_3d, [False, False, True])
+        image_3d = sitk.Flip(image_3d, [False, False, False])
 
 
         window_width = [float(x.strip()) for x in file_reader.GetMetaData(0, "0028|1051").strip().split('\\')][0]
         window_center = [float(x.strip()) for x in file_reader.GetMetaData(0, "0028|1050").strip().split('\\')][0]
-        image_dialog = ImageWindowObject(parent, image_3d, window_center, window_width, 0)
+        image_dialog = ImageWindowObject(parent, image_3d, window_center, window_width, orientation)
         window_width = image_dialog.window_width
         window_center = image_dialog.window_center
+        orientation = image_dialog.orientation
+
+        image_3d = sitk.DICOMOrient(image_3d, orientation)
 
 
         window_min = max(0, window_center - window_width // 2)
@@ -47,9 +52,10 @@ class DicomService:
         # Count Images to Display Progess Bar
         counter = 0
         max_count = image_3d.GetSize()[0] + image_3d.GetSize()[1] + image_3d.GetSize()[2]
-        counter = safe_axis(sitk.Flip(image_3d, [False, True, False]), output_path, "coronal", 1, window_min, window_max, parent, counter, max_count)
+
+        counter = safe_axis(image_3d, output_path, "coronal", 1, window_min, window_max, parent, counter, max_count)
         counter = safe_axis(image_3d, output_path, "sagittal", 0, window_min, window_max, parent, counter, max_count)
-        counter = safe_axis(sitk.Flip(image_3d, [False, False, True]), output_path, "transversal", 2, window_min, window_max, parent, counter, max_count)
+        counter = safe_axis(image_3d, output_path, "transversal", 2, window_min, window_max, parent, counter, max_count)
 
         # Get Orientation
         direction = np.array(image_3d.GetDirection()).tolist()
@@ -62,34 +68,15 @@ class DicomService:
 
         firstPosition = [float(x.strip()) for x in file_reader.GetMetaData(0, "0020|0032").split('\\')]
         lastPosition = [float(x.strip()) for x in file_reader.GetMetaData(len(dicom_names)- 1, "0020|0032").split('\\')]
-
-        data_json['firstImage'] = {
-            'rows': image_3d.GetSize()[1],
-            'cols': image_3d.GetSize()[0],
-            'pos': firstPosition,
-            'direction': direction, 
-            'spacing': spacing[0:2],
-            'slice_thickness': spacing[2]
-        }
-        data_json['lastImage'] = {
-            'rows': image_3d.GetSize()[1],
-            'cols': image_3d.GetSize()[0],
-            'pos': lastPosition,
-            'direction': direction, 
-            'spacing': spacing[0:2],
-            'slice_thickness': spacing[2]
+        
+        data_json = {
+            "size": image_3d.GetSize(),
+            "direction": image_3d.GetDirection(),
+            "origin": image_3d.GetOrigin(),
+            "spacing": image_3d.GetSpacing(),
+            "orientation": orientation, # LAS, LPS, RAS Auch in direction gespeichert
         }
 
-        # Calculate Orientation based on first and last Position
-        diff = np.abs(np.array(lastPosition) - np.array(firstPosition))
-        orientation = "transversal"
-        if diff.argmax() == 0:
-            orientation = "sagittal"
-        elif diff.argmax() == 1:
-            orientation = "coronal"
-        elif diff.argmax() == 2:
-            orientation = "transversal"
-        data_json['sliceOrientation'] = orientation
 
         json.dump(data_json, open(output_path + '/data.json', 'w'), indent=5, sort_keys=True)
 
@@ -118,18 +105,6 @@ def safe_axis(image_3d, filepath, axis_name, axis, window_min, window_max, paren
     return counter
 
     
-def get_slice(volume, index, axis=2):
-    extract = sitk.ExtractImageFilter()
-    
-    size = list(volume.GetSize())
-    size[axis] = 0 
-    extract.SetSize(size)
-    
-    start_index = [0, 0, 0]
-    start_index[axis] = index
-    extract.SetIndex(start_index)
-    
-    return extract.Execute(volume)
 
 def resample_to_isotropic(image):
     # Aktuelles Spacing und Größe 
@@ -156,17 +131,19 @@ def resample_to_isotropic(image):
     return resampler.Execute(image)
 
 class ImageWindowObject():
-    def __init__(self, parent, slices, window_center, window_width, intercept):
+    def __init__(self, parent, slices, window_center, window_width, orientation):
         self.window_center = window_center
         self.window_width = window_width
-        self.open_contrast_adjustment_dialog(parent, slices, window_center, window_width, intercept)
+        self.orientation = orientation
+        self.open_contrast_adjustment_dialog(parent, slices, window_center, window_width, orientation)
 
-    def update_contrast_values(self, v1,v2):
+    def update_contrast_values(self, v1,v2,v3):
         self.window_center = v1
         self.window_width = v2
+        self.orientation = v3
 
-    def open_contrast_adjustment_dialog(self, parent, slices, window_center, window_width, intercept):
-        dialog = ImageDialog(parent, slices, window_center, window_width)
+    def open_contrast_adjustment_dialog(self, parent, slices, window_center, window_width, orientation):
+        dialog = ImageDialog(parent, slices, window_center, window_width, orientation)
         dialog.valuesSelected.connect(self.update_contrast_values)
         dialog.exec_()
 

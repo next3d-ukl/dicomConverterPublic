@@ -2,18 +2,20 @@ from PIL import Image
 import numpy as np
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QImage, QPixmap
-from PyQt5.QtWidgets import QBoxLayout, QDialog, QHBoxLayout, QLabel, QPushButton, QSlider, QVBoxLayout
+from PyQt5.QtWidgets import QBoxLayout, QComboBox, QDialog, QHBoxLayout, QLabel, QPushButton, QSlider, QVBoxLayout
 
 import SimpleITK as sitk
+
+from services.get_slice import get_slice
 
 
 
 
 class ImageDialog(QDialog):
-    valuesSelected = pyqtSignal(int, int)
+    valuesSelected = pyqtSignal(int, int, str)
 
 
-    def __init__(self, parent, image_3d, window_center, window_width):
+    def __init__(self, parent, image_3d, window_center, window_width, orientation):
         super().__init__(parent)
         self.setWindowTitle("Adjust values")
 
@@ -24,6 +26,7 @@ class ImageDialog(QDialog):
         self.layer_sagittal = image_3d.GetSize()[0] // 2
         self.image_3d = image_3d
         self.image_preview_size = 500
+        self.orientation = orientation
 
         # Sliders
         self.window_center_label = QLabel(f"Window Center: {window_center}")
@@ -69,6 +72,20 @@ class ImageDialog(QDialog):
         self.layer_index_coronal.valueChanged.connect(self.layer_changed_coronal)
         self.layer_index_sagittal.valueChanged.connect(self.layer_changed_sagittal)
 
+        self.orientation_combo = QComboBox()
+        self.orientations = [
+            "LPS",
+            "RAS",
+            "LAS",
+            "RPS",
+            "LPI",
+            "RPI",
+            "LAI",
+            "RAI"
+        ]
+        self.orientation_combo.addItems(self.orientations)
+        self.orientation_combo.setCurrentIndex(self.orientations.index(self.orientation))
+
 
         buttons = QHBoxLayout()
         ok_btn = QPushButton("OK")
@@ -103,6 +120,10 @@ class ImageDialog(QDialog):
 
         layout = QVBoxLayout()
         layout.addLayout(horizontal_layout)
+        layout.addWidget(self.orientation_combo)
+        ok_btn = QPushButton("Apply Orientation")
+        ok_btn.clicked.connect(self.orientation_applied)
+        layout.addWidget(ok_btn)
         layout.addWidget(self.layer_label_coronal)
         layout.addWidget(self.layer_index_coronal)
         layout.addWidget(self.window_center_label)
@@ -141,14 +162,15 @@ class ImageDialog(QDialog):
 
     def update_pixmap_transversal(self):
         try:
-            slice = get_slice(sitk.Flip(self.image_3d, [False, False, True]), self.layer_transversal, 2)
+
+            slice = get_slice(self.image_3d, self.layer_transversal, 2)
             self.image_preview_transversal.setPixmap(self.sitk_to_qpixmap(slice, self.window_center, self.window_width))
         except Exception as e:
             print(f"Error opening slice: {e}")
 
     def update_pixmap_coronal(self):
         try:
-            slice = get_slice(sitk.Flip(self.image_3d, [False, True, False]), self.layer_coronal, 1)
+            slice = get_slice(self.image_3d, self.layer_coronal, 1)
             self.image_preview_coronal.setPixmap(self.sitk_to_qpixmap(slice, self.window_center, self.window_width))
         except Exception as e:
             print(f"Error opening slice: {e}")
@@ -160,13 +182,22 @@ class ImageDialog(QDialog):
         except Exception as e:
             print(f"Error opening slice: {e}")
 
+    def orientation_applied(self):
+        self.orientation = self.orientation_combo.currentText()
+
+        self.image_3d = sitk.DICOMOrient(self.image_3d, self.orientation)
+
+        self.update_pixmap_transversal()
+        self.update_pixmap_coronal()
+        self.update_pixmap_sagittal()
+
 
     def accept(self):
         self.valuesSelected.emit(*self.get_values())
         super().accept()
 
     def get_values(self):
-        return self.window_center_slider.value(), self.window_width_slider.value()
+        return self.window_center_slider.value(), self.window_width_slider.value(), self.orientation
 
     def sitk_to_qpixmap(self, sitk_slice, window_center=40, window_width=400):
         """
@@ -190,17 +221,3 @@ class ImageDialog(QDialog):
         q_image = QImage(data.data, width,  height, width, QImage.Format.Format_Grayscale8).scaled(self.image_preview_size, self.image_preview_size,Qt.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
         
         return QPixmap.fromImage(q_image.copy())
-
-def get_slice(volume, index, axis=2):
-    extract = sitk.ExtractImageFilter()
-    
-    size = list(volume.GetSize())
-    size[axis] = 0 
-    extract.SetSize(size)
-    
-    start_index = [0, 0, 0]
-    start_index[axis] = index
-    extract.SetIndex(start_index)
-    
-    return extract.Execute(volume)
-
