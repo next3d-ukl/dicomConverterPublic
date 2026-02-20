@@ -44,7 +44,7 @@ class ColorList:
         Color((0.090, 0.251, 0.341, 1.0), 0.4, ["chiasm_transparent"]),
         Color((0.1, 0.1, 0.1, 1.0), 0.4, ["ac_transparent"]),
         Color((0.1, 0.1, 0.1, 1.0), 0.4, ["pc_transparent"]),
-        Color((0.69, 0.32, 0.87, 1.0), 0.4, ["safetyzone_transparent"]),
+        Color((0.69, 0.32, 0.87, 1.0), 0.4, ["safezone_transparent"]),
         Color((0.85, 0.65, 0.49, 1.0), 1.0, ["skin"]),
         Color((0.5, 0.5, 0.5, 1.0), 1.0, ["skull"]),
         Color((0.5, 0.5, 0.5, 1.0), 1.0, ["bone"]),
@@ -67,7 +67,7 @@ class ColorList:
         Color((0.090, 0.251, 0.341, 1.0), 1.0, ["chiasm"]),
         Color((0.1, 0.1, 0.1, 1.0), 1.0, ["ac"]),
         Color((0.1, 0.1, 0.1, 1.0), 1.0, ["pc"]),
-        Color((0.69, 0.32, 0.87, 1.0), 0.4, ["safetyzone"]),
+        Color((0.69, 0.32, 0.87, 1.0), 0.4, ["safezone"]),
     ]
 
     def getColorList(self):
