@@ -21,6 +21,7 @@ import subprocess
 import os
 import bpy
 import glob
+import shutil
 
 from models.color_list_class import ColorList
 
@@ -51,6 +52,9 @@ class MainWindow(QMainWindow):
 
         self.init_ui()
         self.init_menu()
+
+        self.on_dicom_folder_selected(self.input_folder)
+        self.update_start_button_state()
 
         # Redirect stdout and stderr with progress bar support
         sys.stdout = ConsoleRedirect(self.console_output, sys.stdout, self.progress_bar)
@@ -118,7 +122,7 @@ class MainWindow(QMainWindow):
 
         self.start_button = QPushButton("Start Conversion")
         self.start_button.clicked.connect(self.start_conversion)
-        self.start_button.setEnabled(False)  # Disabled until input and output folders are selected
+        self.start_button.setEnabled(True)  # Disabled until input and output folders are selected
         input_layout.addWidget(self.start_button)
 
         # Add progress bar
@@ -371,7 +375,7 @@ class MainWindow(QMainWindow):
 
     def start_conversion(self):
         """Start the DICOM conversion process"""
-        self.view_model.start_conversion(self.input_folder, self.output_folder)
+        self.view_model.start_conversion(self, self.input_folder, self.output_folder)
 
     def load_stl(self):
         """Load an STL file for 3D visualization"""
@@ -474,6 +478,7 @@ class MainWindow(QMainWindow):
         # If the error was about the output folder not being empty, open folder picker
         if "Output folder must be empty" in error_message:
             self.select_output_folder()
+
     
     @pyqtSlot(np.ndarray, np.ndarray)
     def on_stl_loaded(self, vertices: np.ndarray, faces: np.ndarray):
@@ -526,76 +531,6 @@ class MainWindow(QMainWindow):
         if hasattr(self, 'gl_view'):
             self.gl_view.clear()
             print("3D view cleared")
-        
-    def display_cross_section_images(self):
-        """Display the center cross-section images in the 3D view"""
-        # Clear current items
-        self.clear_gl_view()
-        
-        # Get center image paths from viewmodel
-        image_paths = self.view_model.get_center_cross_section_images()
-        
-        if not image_paths:
-            print("No cross-section images available to display")
-            return
-            
-        # Log the image paths
-        for orientation, path in image_paths.items():
-            print(f"{orientation} image path: {path}")
-        
-        # Process and add images to the 3D view (all done on the main thread)
-        images = {}
-        
-        # First load all images on the main thread
-        try:
-            for orientation, path in image_paths.items():
-                try:
-                    # Load the image
-                    image = Image.open(path).convert("L")
-                    # Convert to numpy array and normalize to [0, 1]
-                    array = np.array(image) / 255.0
-                    # Convert to RGBA
-                    rgba = np.stack((array,) * 3 + (np.ones_like(array),), axis=-1) * 255
-                    rgba = rgba.astype(np.ubyte)
-                    
-                    # Store processed image
-                    images[orientation] = rgba
-                    print(f"{orientation} image shape: {rgba.shape}")
-                except Exception as e:
-                    print(f"Error loading image for {orientation}: {e}")
-        except Exception as e:
-            print(f"Error processing images: {e}")
-            return
-            
-        # Now add the images to the GL view
-        try:
-            # Transversal
-            if "transversal" in images:
-                transversal_gl_image = gl.GLImageItem(images["transversal"])
-                transversal_gl_image.translate(-0.5, -0.5, 0)
-                self.gl_view.addItem(transversal_gl_image)
-                print("Transversal image added")
-                
-            # Coronal
-            if "coronal" in images:
-                coronal_gl_image = gl.GLImageItem(images["coronal"])
-                coronal_gl_image.rotate(90, 0, 1, 0)
-                coronal_gl_image.translate(0, -0.5, -0.5)
-                self.gl_view.addItem(coronal_gl_image)
-                print("Coronal image added")
-                
-            # Sagittal
-            if "sagittal" in images:
-                sagittal_gl_image = gl.GLImageItem(images["sagittal"])
-                sagittal_gl_image.rotate(90, 1, 0, 0)
-                sagittal_gl_image.translate(-0.5, 0, -0.5)
-                self.gl_view.addItem(sagittal_gl_image)
-                print("Sagittal image added")
-                
-        except Exception as e:
-            print(f"Error displaying cross-section images: {e}")
-            
-        print("Cross-section images displayed")
 
 
     def run(self):

@@ -1,5 +1,7 @@
 import os
 import json
+
+from cv2.gapi import mul
 import numpy as np
 from PIL import Image
 from pydicom import dcmread
@@ -17,6 +19,7 @@ class DicomService:
             
     @staticmethod
     def load_image_as_array(file_path: str) -> np.ndarray:
+        print("load_image_as_array")
         """
         Load image as a NumPy array
         """
@@ -24,47 +27,10 @@ class DicomService:
         img_array = np.array(img)
         return img_array
 
-    @staticmethod
-    def resize_input_images(json_path: str, image_paths: List[str], 
-                          horizontal_spacing: float, vertical_spacing: float, 
-                          depth_spacing: float) -> None:
-        """
-        Resize input images for proper display
-        """
-        multiplier = int(depth_spacing // horizontal_spacing)
-
-        # Calculate the new dimensions
-        old_width, old_height = 0, 0
-        new_width = 0
-        new_height = 0
-
-        for path in image_paths:
-            with Image.open(path) as img:
-                # Calculate the new dimensions
-                old_width, old_height = img.size
-
-                new_width = int(old_width * (horizontal_spacing * multiplier / depth_spacing))
-                new_height = int(old_height * (vertical_spacing * multiplier / depth_spacing))
-
-                resized_img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
-                resized_img.save(path)
-
-        with open(json_path, 'r') as file:
-            data = json.load(file)
-
-        data['firstImage']['cols'] = new_width
-        data['firstImage']['rows'] = new_height
-        data['firstImage']['spacing'] = [old_width / new_width * horizontal_spacing, old_height / new_height * vertical_spacing]
-        data['lastImage']['cols'] = new_width
-        data['lastImage']['rows'] = new_height
-        data['lastImage']['spacing'] = [old_width / new_width * horizontal_spacing, old_height / new_height * vertical_spacing]
-
-        # Write the updated JSON back to the file
-        with open(json_path, 'w') as file:
-            json.dump(data, file, indent=4)
 
     @staticmethod
-    def create_column_images(image_paths: List[str], multiplier: int, orientation: str) -> List[np.ndarray]:
+    def create_column_images(image_paths: List[str], multiplier: float, orientation: str) -> List[np.ndarray]:
+        print("create_column_images")
         """
         Create column-based cross-sectional images
         
@@ -103,12 +69,20 @@ class DicomService:
         # Create result images for each column index
         for col_index in range(width):
             # Create an empty array for the new image
-            new_img = np.zeros((height, len(images) * multiplier), dtype=images[0].dtype)
+            new_img = np.zeros((height, int(len(images) * multiplier)), dtype=images[0].dtype)
             
             # Populate the new image array with the specific column from each input image
-            for img_index in range(len(images) * multiplier):
-                img = images[img_index // multiplier]
-                new_img[:, img_index] = img[:, col_index]
+
+            length = len(images)
+
+            for img_index in range(int(length * multiplier)):
+                # Interpolate between images
+                layer = int((img_index - multiplier / 2) / multiplier)
+                img_before = images[min(length-1,max(0,layer))][:,col_index]
+                img_after = images[min(length-1,max(0,layer+1))][:,col_index]
+                alpha = ((img_index - (multiplier / 2)) % multiplier) / multiplier
+                img = img_before * (1-alpha) + img_after * alpha
+                new_img[:, img_index] = img[:]
             
             # Transpose the new image to swap rows and columns
             new_img = np.transpose(new_img, (1, 0))
@@ -131,7 +105,8 @@ class DicomService:
         return result_images
 
     @staticmethod
-    def create_row_images(image_paths: List[str], multiplier: int, orientation: str) -> List[np.ndarray]:
+    def create_row_images(image_paths: List[str], multiplier: float, orientation: str) -> List[np.ndarray]:
+        print("create_row_images")
         """
         Create row-based cross-sectional images
         
@@ -168,12 +143,19 @@ class DicomService:
         # Create result images for each row index
         for row_index in range(height):
             # Create an empty array for the new image
-            new_img = np.zeros((len(images) * multiplier, width), dtype=images[0].dtype)
+            new_img = np.zeros((int(len(images) * multiplier), width), dtype=images[0].dtype)
             
             # Populate the new image array with the specific row from each input image
-            for img_index in range(len(images) * multiplier):
-                img = images[img_index // multiplier]
-                new_img[img_index, :] = img[row_index, :]
+            length = len(images)
+
+            for img_index in range(int(length * multiplier)):
+                # Interpolate between images
+                layer = int((img_index - multiplier / 2) / multiplier)
+                img_before = images[min(length-1,max(0,layer))][row_index,:]
+                img_after = images[min(length-1,max(0,layer+1))][row_index,:]
+                alpha = ((img_index - (multiplier / 2)) % multiplier) / multiplier
+                img = img_before * (1-alpha) + img_after * alpha
+                new_img[img_index,:] = img[:]
             
             # Apply orientation-specific transformations
             if orientation == "transversal":
@@ -199,6 +181,7 @@ class DicomService:
     def process_cross_sections(output_folder: str, base_orientation: str, columns_folder: str, 
                               rows_folder: str, horizontal_spacing: float, 
                               vertical_spacing: float, depth_spacing: float) -> None:
+        print("process_cross_sections")
         """
         Process images to create cross-sectional views
         """
@@ -209,21 +192,13 @@ class DicomService:
             if f.endswith(('png', 'jpg', 'jpeg'))
         ])
 
-        # Step 1: Resize images (70% to 75%)
-        DicomService.resize_input_images(
-            output_folder + "/data.json", 
-            image_paths, 
-            horizontal_spacing, 
-            vertical_spacing, 
-            depth_spacing
-        )
-        print(f"Resized {base_orientation} images")
+        # Keep Original Size of Images
         print(f"PROGRESS: 75 / 100")  # Signal 75% progress after resizing
 
         # Step 2: Create column images (75% to 80%)
         column_result_images = DicomService.create_column_images(
             image_paths, 
-            int(depth_spacing // vertical_spacing),
+            depth_spacing / vertical_spacing,
             base_orientation  # Pass the orientation for proper transformations
         )
         print(f"Calculated {columns_folder} images (column)")
@@ -232,7 +207,7 @@ class DicomService:
         # Step 3: Create row images (80% to 85%)
         row_result_images = DicomService.create_row_images(
             image_paths, 
-            int(depth_spacing // horizontal_spacing),
+            depth_spacing / vertical_spacing,
             base_orientation  # Pass the orientation for proper transformations
         )
         print(f"Calculated {rows_folder} images (row)")
@@ -259,12 +234,18 @@ class DicomService:
         print("Conversion finished!")
 
     @staticmethod
-    def run_conversion(input_path: str, output_path: str) -> DicomData:
+    def run_conversion(parent, input_path: str, output_path: str) -> DicomData:
+        print("run_conversion")
         """
         Run the complete DICOM conversion process and return data model
         """
         # Step 1: Convert DICOM to images
-        orientation, horizontal_spacing, vertical_spacing, depth_spacing = convert_dicom_to_images(input_path, output_path)
+        # Open here image
+        orientation, horizontal_spacing, vertical_spacing, depth_spacing = convert_dicom_to_images(parent, input_path, output_path)
+        print("RETURN VALUE convert_dicom_to_images(input_path, output_path)")
+        print("-------------------------------------------------------------")
+        print(f"orientation: {orientation}, horizontal_spacing: {horizontal_spacing}, vertical_spacing: {vertical_spacing}, depth_spacing: {depth_spacing}")
+        print("-------------------------------------------------------------")
         
         # Get derived orientation names
         columns_folder = DicomService.get_orientation_names(orientation)['columns']
@@ -299,6 +280,7 @@ class DicomService:
         
     @staticmethod
     def get_orientation_names(slice_orientation: str) -> Dict[str, str]:
+        print("get_orientation_names")
         """
         Get names of derived orientations based on slice orientation
         """
@@ -312,3 +294,4 @@ class DicomService:
             return direction_map[slice_orientation]
         else:
             return {"rows": "rows", "columns": "columns"}
+
