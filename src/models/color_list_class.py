@@ -11,6 +11,13 @@ class Color:
         self.alpha = alpha
         self.clues = clues
 
+#Beispiele:
+#Color((1.0, 0.23, 0.19, 1.0), 1.0, )   // Rot
+#Color((0.0, 0.48, 1.0, 1.0), 1.0, )    // Blau
+#Color((0.20, 0.78, 0.35, 1.0), 1.0, )  // Grün
+#Color((1.0, 0.80, 0.0, 1.0), 1.0, )    // Gelb
+#Color((1.0, 0.58, 0.0, 1.0), 1.0, )    // Orange
+#Color((0.69, 0.32, 0.87, 1.0), 1.0, )  // Violett
 
 class ColorList:
     cList = [
@@ -18,10 +25,12 @@ class ColorList:
         Color((0.5, 0.5, 0.5, 1.0), 0.4, ["skull_transparent"]),
         Color((0.5, 0.5, 0.5, 1.0), 0.4, ["bone_transparent"]),
         Color((0.5, 0.5, 0.5, 1.0), 0.4, ["bones_transparent"]),
+        Color((0.94, 0.59, 0.56, 1.0), 0.4, ["muscle_transparent"]),
         Color((0.94, 0.59, 0.56, 1.0), 0.4, ["cerebrum_transparent"]),
         Color((0.64, 0.35, 0.33, 1.0), 0.4, ["brainstem_transparent"]),
         Color((0.94, 0.59, 0.56, 1.0), 0.4, ["brain_transparent"]),
         Color((0.79, 0.00, 0.04, 1.0), 0.4, ["tumor_transparent"]),
+        Color((0.79, 0.00, 0.04, 1.0), 0.4, ["sarkom"]),
         Color((0.16, 0.28, 0.54, 1.0), 0.4, ["sinus_transparent"]),
         Color((0.35, 0.77, 0.96, 1.0), 0.4, ["ventricles_transparent"]),
         Color((0.44, 0.00, 0.11, 1.0), 0.4, ["vessel_transparent"]),
@@ -35,13 +44,16 @@ class ColorList:
         Color((0.090, 0.251, 0.341, 1.0), 0.4, ["chiasm_transparent"]),
         Color((0.1, 0.1, 0.1, 1.0), 0.4, ["ac_transparent"]),
         Color((0.1, 0.1, 0.1, 1.0), 0.4, ["pc_transparent"]),
+        Color((0.69, 0.32, 0.87, 1.0), 0.4, ["safetyzone_transparent"]),
         Color((0.85, 0.65, 0.49, 1.0), 1.0, ["skin"]),
         Color((0.5, 0.5, 0.5, 1.0), 1.0, ["skull"]),
         Color((0.5, 0.5, 0.5, 1.0), 1.0, ["bone"]),
+        Color((0.94, 0.59, 0.56, 1.0), 1.0, ["muscle_transparent"]),
         Color((0.94, 0.59, 0.56, 1.0), 1.0, ["cerebrum"]),
         Color((0.64, 0.35, 0.33, 1.0), 1.0, ["brainstem"]),
         Color((0.94, 0.59, 0.56, 1.0), 1.0, ["brain"]),
         Color((0.79, 0.00, 0.04, 1.0), 1.0, ["tumor"]),
+        Color((0.79, 0.00, 0.04, 1.0), 1.0, ["sarkom"]),
         Color((0.16, 0.28, 0.54, 1.0), 1.0, ["sinus"]),
         Color((0.35, 0.77, 0.96, 1.0), 1.0, ["ventricles"]),
         Color((0.44, 0.00, 0.11, 1.0), 1.0, ["vessel"]),
@@ -54,7 +66,8 @@ class ColorList:
         Color((0.980, 0.918, 0.020, 1.0), 1.0, ["eye"]),
         Color((0.090, 0.251, 0.341, 1.0), 1.0, ["chiasm"]),
         Color((0.1, 0.1, 0.1, 1.0), 1.0, ["ac"]),
-        Color((0.1, 0.1, 0.1, 1.0), 1.0, ["pc"])
+        Color((0.1, 0.1, 0.1, 1.0), 1.0, ["pc"]),
+        Color((0.69, 0.32, 0.87, 1.0), 0.4, ["safetyzone"]),
     ]
 
     def getColorList(self):
@@ -75,3 +88,6 @@ class ColorList:
     def defaultAlpha_transparent(self):
         default_alpha_transparent = 0.4
         return default_alpha_transparent
+        
+
+
