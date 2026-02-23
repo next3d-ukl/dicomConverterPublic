@@ -30,7 +30,7 @@ class ColorList:
         Color((0.64, 0.35, 0.33, 1.0), 0.4, ["brainstem_transparent"]),
         Color((0.94, 0.59, 0.56, 1.0), 0.4, ["brain_transparent"]),
         Color((0.79, 0.00, 0.04, 1.0), 0.4, ["tumor_transparent"]),
-        Color((0.79, 0.00, 0.04, 1.0), 0.4, ["sarkom"]),
+        Color((0.79, 0.00, 0.04, 1.0), 0.4, ["sarkom_transparent"]),
         Color((0.16, 0.28, 0.54, 1.0), 0.4, ["sinus_transparent"]),
         Color((0.35, 0.77, 0.96, 1.0), 0.4, ["ventricles_transparent"]),
         Color((0.44, 0.00, 0.11, 1.0), 0.4, ["vessel_transparent"]),
