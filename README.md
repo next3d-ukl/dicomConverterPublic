@@ -55,7 +55,9 @@ The following dependencies will be installed for you on start:
 
 3. **Start Conversion**: Click "Start Conversion" to begin the process. A progress bar will show the conversion status.
 
-4. **View Results**: Upon completion, the output folder will automatically open.
+4. **Adjust Contrast**: Use the sliders to find your optimal contrast. Keep RAS as orientation for a working navigation.
+
+5. **View Results**: Upon completion, the output folder will automatically open.
 
 ### Object Convertion
 
