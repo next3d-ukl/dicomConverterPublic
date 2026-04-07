@@ -46,8 +46,8 @@ class DicomService:
         image_3d = sitk.DICOMOrient(image_3d, orientation)
 
 
-        window_min = max(0, window_center - window_width // 2)
-        window_max = min(3000, window_center + window_width // 2)
+        window_min = float(window_center - window_width / 2.0)
+        window_max = float(window_center + window_width / 2.0)
 
         # Count Images to Display Progess Bar
         counter = 0
@@ -98,7 +98,8 @@ def safe_axis(image_3d, filepath, axis_name, axis, window_min, window_max, paren
         parent.progress_bar.setValue(int(counter/max_count * 100))
 
         slice = get_slice(image_3d,i,axis)
-        img_255 = sitk.IntensityWindowing(slice,window_min, window_max, 0, 255)
+        slice = sitk.Cast(slice, sitk.sitkFloat32)
+        img_255 = sitk.IntensityWindowing(slice, window_min, window_max, 0.0, 255.0)
         img_8bit = sitk.Cast(img_255, sitk.sitkUInt8)
         out_filepath = os.path.normpath(os.path.join(folder, f"image{i}.png"))
         sitk.WriteImage(img_8bit, out_filepath)
