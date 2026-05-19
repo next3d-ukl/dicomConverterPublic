@@ -698,9 +698,10 @@ class MainWindow(QMainWindow):
                 break
 
         if color_not_found:
-            if "transparent" in name_lower:
-                color = colorList.defaultColor_transparent()
-                alpha = colorList.defaultAlpha_transparent()
+            if "nerv" in name_lower:
+                color = colorList.nerveColor_opaque()
+                alpha = colorList.defaultAlpha_opaque()
+                print("identified as nerv, setting random yellow-orange color")
             else:
                 color = colorList.defaultColor_opaque()
                 alpha = colorList.defaultAlpha_opaque()
